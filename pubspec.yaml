@@ -1,0 +1,34 @@
+name: xvagenda
+description: Application mobile pour visualiser les événements du XV de l'Erdre
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Pour accéder aux Google Sheets
+  gsheets: ^0.5.0
+  
+  # Pour l'affichage du calendrier
+  calendar_view: ^1.0.4
+  
+  # Gestion des dates
+  intl: ^0.20.2
+  
+  # Pour accéder au système de fichiers
+  path_provider: ^2.1.1
+  
+  # Icônes Material
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
