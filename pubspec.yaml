@@ -22,6 +22,9 @@ dependencies:
   # Pour accéder au système de fichiers
   path_provider: ^2.1.1
   
+  # Pour la persistance des données
+  shared_preferences: ^2.2.2
+  
   # Icônes Material
   cupertino_icons: ^1.0.2
 

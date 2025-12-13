@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
 import 'utils/logger.dart';
 
@@ -10,6 +11,15 @@ void main() async {
   final logger = AppLogger();
   await logger.init();
   logger.info('🏉 Démarrage de l\'application XV Agenda');
+  
+  // Initialiser SharedPreferences et définir le flag de première exécution
+  final prefs = await SharedPreferences.getInstance();
+  final isFirstRun = prefs.getBool('has_launched') ?? true;
+  
+  if (isFirstRun) {
+    await prefs.setBool('has_launched', true);
+    logger.info('✨ Première exécution de l\'application');
+  }
   
   runApp(const XVAgendaApp());
 }
