@@ -21,6 +21,32 @@ class RugbyEvent {
     this.category,
   });
 
+  // Convertir en Map pour la base de données
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime.toIso8601String(),
+      'location': location,
+      'category': category,
+    };
+  }
+
+  // Créer depuis une Map de la base de données
+  factory RugbyEvent.fromMap(Map<String, dynamic> map) {
+    return RugbyEvent(
+      id: map['id'] as String,
+      title: map['title'] as String,
+      description: map['description'] as String,
+      startTime: DateTime.parse(map['startTime'] as String),
+      endTime: DateTime.parse(map['endTime'] as String),
+      location: map['location'] as String?,
+      category: map['category'] as String?,
+    );
+  }
+
   // Constructeur depuis une ligne Google Sheets
   // Format attendu: [ID, Titre, Description, Date début, Date fin, Lieu, Catégorie]
   factory RugbyEvent.fromSheetRow(List<dynamic> row) {
@@ -43,7 +69,7 @@ class RugbyEvent {
     return event;
   }
 
-  // Parse une date au format ISO ou dd/MM/yyyy HH:mm
+  // Parse une date au format ISO, Google Sheets ou dd/MM/yyyy HH:mm:ss
   static DateTime _parseDateTime(String dateStr) {
     if (dateStr.isEmpty) {
       _logger.warning('⚠️ Date vide détectée, utilisation de la date actuelle');
@@ -52,10 +78,11 @@ class RugbyEvent {
 
     // Nettoyer la chaîne
     dateStr = dateStr.trim();
+    _logger.debug('🔍 Tentative de parsing: "$dateStr"');
     
     try {
       // Format ISO 8601: 2025-12-01T14:00:00 ou 2025-12-01
-      if (dateStr.contains('T') || dateStr.contains('-')) {
+      if (dateStr.contains('T') || (dateStr.contains('-') && dateStr.length >= 10)) {
         final parsed = DateTime.parse(dateStr);
         _logger.success('✅ Date ISO parsée: $dateStr -> $parsed');
         return parsed;
@@ -65,67 +92,95 @@ class RugbyEvent {
     }
 
     try {
-      // Format français: dd/MM/yyyy HH:mm ou dd/MM/yyyy
+      // Format YYYY-MM-DD (Google Sheets peut retourner ça)
+      if (dateStr.contains('-') && !dateStr.contains('/')) {
+        final parts = dateStr.split(' ');
+        final dateParts = parts[0].split('-');
+        
+        if (dateParts.length == 3) {
+          final year = int.parse(dateParts[0].trim());
+          final month = int.parse(dateParts[1].trim());
+          final day = int.parse(dateParts[2].trim());
+          
+          int hour = 0;
+          int minute = 0;
+          int second = 0;
+          
+          // Si une heure est présente
+          if (parts.length > 1 && parts[1].isNotEmpty) {
+            final timeParts = parts[1].split(':');
+            if (timeParts.length >= 1) {
+              hour = int.parse(timeParts[0].trim());
+            }
+            if (timeParts.length >= 2) {
+              minute = int.parse(timeParts[1].trim());
+            }
+            if (timeParts.length >= 3) {
+              second = int.parse(timeParts[2].trim());
+            }
+          }
+          
+          final parsed = DateTime(year, month, day, hour, minute, second);
+          _logger.success('✅ Date YYYY-MM-DD parsée: $dateStr -> $parsed');
+          return parsed;
+        }
+      }
+    } catch (e) {
+      _logger.debug('❌ Échec parsing YYYY-MM-DD pour: $dateStr - Erreur: $e');
+    }
+
+    try {
+      // Format français: dd/MM/yyyy HH:mm:ss ou dd/MM/yyyy HH:mm ou dd/MM/yyyy
       if (dateStr.contains('/')) {
         final parts = dateStr.split(' ');
         final dateParts = parts[0].split('/');
         
         if (dateParts.length == 3) {
-          final day = int.parse(dateParts[0].trim());
-          final month = int.parse(dateParts[1].trim());
+          final firstNum = int.parse(dateParts[0].trim());
+          final secondNum = int.parse(dateParts[1].trim());
           final year = int.parse(dateParts[2].trim());
+          
+          // Heuristique: si le premier nombre > 12, c'est le jour (format français)
+          // sinon, vérifier le mois
+          int day, month;
+          if (firstNum > 12) {
+            day = firstNum;
+            month = secondNum;
+          } else if (secondNum > 12) {
+            // Format américain détecté
+            month = firstNum;
+            day = secondNum;
+          } else {
+            // Ambigü - par défaut, on suppose français
+            day = firstNum;
+            month = secondNum;
+          }
           
           int hour = 0;
           int minute = 0;
+          int second = 0;
           
           // Si une heure est présente
           if (parts.length > 1 && parts[1].isNotEmpty) {
             final timeParts = parts[1].split(':');
-            if (timeParts.length >= 2) {
+            if (timeParts.length >= 1) {
               hour = int.parse(timeParts[0].trim());
+            }
+            if (timeParts.length >= 2) {
               minute = int.parse(timeParts[1].trim());
+            }
+            if (timeParts.length >= 3) {
+              second = int.parse(timeParts[2].trim());
             }
           }
           
-          final parsed = DateTime(year, month, day, hour, minute);
-          _logger.success('✅ Date française parsée: $dateStr -> $parsed');
+          final parsed = DateTime(year, month, day, hour, minute, second);
+          _logger.success('✅ Date avec slash parsée ($day/$month/$year): $dateStr -> $parsed');
           return parsed;
         }
       }
     } catch (e) {
-      _logger.debug('❌ Échec parsing français pour: $dateStr - Erreur: $e');
-    }
-
-    try {
-      // Format américain: MM/dd/yyyy HH:mm
-      if (dateStr.contains('/')) {
-        final parts = dateStr.split(' ');
-        final dateParts = parts[0].split('/');
-        
-        if (dateParts.length == 3 && int.parse(dateParts[0]) > 12) {
-          // Si le premier nombre > 12, c'est probablement un jour
-          final day = int.parse(dateParts[1].trim());
-          final month = int.parse(dateParts[0].trim());
-          final year = int.parse(dateParts[2].trim());
-          
-          int hour = 0;
-          int minute = 0;
-          
-          if (parts.length > 1 && parts[1].isNotEmpty) {
-            final timeParts = parts[1].split(':');
-            if (timeParts.length >= 2) {
-              hour = int.parse(timeParts[0].trim());
-              minute = int.parse(timeParts[1].trim());
-            }
-          }
-          
-          final parsed = DateTime(year, month, day, hour, minute);
-          _logger.success('✅ Date américaine parsée: $dateStr -> $parsed');
-          return parsed;
-        }
-      }
-    } catch (e) {
-      _logger.debug('❌ Échec parsing américain pour: $dateStr');
+      _logger.debug('❌ Échec parsing avec slash pour: $dateStr - Erreur: $e');
     }
 
     // Format date Excel (numéro de série)
@@ -135,6 +190,14 @@ class RugbyEvent {
         // Excel compte depuis le 1/1/1900
         final baseDate = DateTime(1899, 12, 30);
         final parsed = baseDate.add(Duration(days: excelDate.floor()));
+        
+        // Gérer les heures décimales pour Excel
+        if (excelDate != excelDate.floor()) {
+          final fractionalPart = excelDate - excelDate.floor();
+          final microseconds = (fractionalPart * 24 * 60 * 60 * 1000000).toInt();
+          return parsed.add(Duration(microseconds: microseconds));
+        }
+        
         _logger.success('✅ Date Excel parsée: $dateStr -> $parsed');
         return parsed;
       }

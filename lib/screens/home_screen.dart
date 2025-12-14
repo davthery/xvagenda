@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
 import '../models/rugby_event.dart';
 import '../services/google_sheets_service.dart';
+import '../services/database_service.dart';
 import '../utils/logger.dart';
 import 'log_viewer_screen.dart';
 
@@ -14,24 +15,26 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GoogleSheetsService _sheetsService = GoogleSheetsService();
+  final DatabaseService _dbService = DatabaseService();
   final EventController _eventController = EventController();
   final _logger = AppLogger();
   bool _isLoading = true;
   String? _errorMessage;
   DateTime _currentMonth = DateTime.now();
   final GlobalKey<MonthViewState> _monthViewKey = GlobalKey<MonthViewState>();
+  bool _isOffline = false;
 
   @override
   void initState() {
     super.initState();
     _loadEvents();
-  }
+  } //ou la base de données
 
-  // Charge les événements depuis Google Sheets
   Future<void> _loadEvents() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _isOffline = false;
     });
 
     try {
@@ -40,9 +43,29 @@ class _HomeScreenState extends State<HomeScreen> {
       // Vide le contrôleur avant de recharger
       _eventController.removeWhere((event) => true);
       
-      // Initialise le service et récupère les événements
+      List<RugbyEvent> events = [];
+      
+      // Essaie d'abord de charger depuis Google Sheets
+      try {
+        _logger.info('🌐 Tentative de chargement depuis Google Sheets...');
+        await _sheetsService.init();
+        events = await _sheetsService.fetchEvents();
+        _logger.success('✅ Événements chargés depuis Google Sheets');
+      } catch (e) {
+        // En cas d'erreur réseau, charge depuis la base de données locale
+        _logger.warning('⚠️ Impossible de charger depuis Google Sheets: $e');
+        _logger.info('📱 Chargement depuis la base de données locale...');
+        events = await _dbService.getAllEvents();
+        
+        if (events.isNotEmpty) {
+          _isOffline = true;
+          _logger.success('✅ Événements chargés depuis la base de données locale');
+        } else {
+          throw Exception('Aucun événement disponible et impossible de se connecter à Google Sheets');
+        }
+      }
       await _sheetsService.init();
-      final events = await _sheetsService.fetchEvents();
+      events = await _sheetsService.fetchEvents();
 
       _logger.info('📅 Ajout des événements au calendrier:');
       
@@ -50,9 +73,12 @@ class _HomeScreenState extends State<HomeScreen> {
       for (var event in events) {
         _logger.debug('  → ${event.title}: ${event.startTime}');
         
+        // Format du titre avec les heures
+        final eventTitle = '${_formatTime(event.startTime)} - ${event.title}';
+        
         _eventController.add(
           CalendarEventData(
-            title: event.title,
+            title: eventTitle,
             description: event.description,
             date: event.startTime,
             startTime: event.startTime,
@@ -130,10 +156,41 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('XV de l\'Erdre - Planning'),
-        backgroundColor: Colors.green[800],
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/logo.png',
+              height: 28,
+              width: 28,
+            ),
+            const SizedBox(width: 12),
+            const Text('XV de l\'Erdre - Planning'),
+          ],
+        ),
+        backgroundColor: const Color.fromARGB(255, 24, 24, 24),
         foregroundColor: Colors.white,
         actions: [
+          if (_isOffline)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Center(
+                child: Tooltip(
+                  message: 'Mode hors ligne - données en cache',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off, size: 20),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Hors ligne',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.article),
             onPressed: () {
@@ -328,10 +385,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showEventDetails(BuildContext context, CalendarEventData event) {
     final rugbyEvent = event.event as RugbyEvent;
     
+    // Extraire le titre original sans les heures
+    final titleWithTime = event.title;
+    final originalTitle = event.title; // TODO titleWithTime.contains(' - ') 
+  //    ? titleWithTime.split(' - ', 1)[1] 
+  //    : titleWithTime;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(event.title),
+        title: Text(originalTitle),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,12 +482,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 itemCount: events.length,
                 itemBuilder: (context, index) {
                   final event = events[index];
+                  // Extraire le titre original sans les heures
+                /*  final titleWithTime = event.title;
+                  final originalTitle = titleWithTime.contains(' - ') 
+                    ? titleWithTime.split(' - ', 1)[1] 
+                    : titleWithTime;
+                  */
                   return Card(
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: event.color,
                         child: const Icon(Icons.event, color: Colors.white),
                       ),
+//                      title: Text(originalTitle),
                       title: Text(event.title),
                       subtitle: Text(
                         '${_formatTime(event.startTime!)} - ${_formatTime(event.endTime!)}',

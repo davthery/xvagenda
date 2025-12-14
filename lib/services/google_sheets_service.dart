@@ -1,6 +1,7 @@
 import 'package:gsheets/gsheets.dart';
 import '../models/rugby_event.dart';
 import '../utils/logger.dart';
+import 'database_service.dart';
 
 class GoogleSheetsService {
   // Vos credentials Google Sheets API
@@ -28,6 +29,7 @@ class GoogleSheetsService {
   static const _worksheetTitle = 'Planning';
 
   final _logger = AppLogger();
+  final _dbService = DatabaseService();
   
   GSheets? _gsheets;
   Spreadsheet? _spreadsheet;
@@ -81,6 +83,12 @@ class GoogleSheetsService {
       }
 
       _logger.success('✅ ${events.length} événements valides récupérés');
+      
+      // Sauvegarde les événements en base de données
+      if (events.isNotEmpty) {
+        await _dbService.insertEvents(events);
+      }
+      
       return events;
     } catch (e) {
       _logger.error('❌ Erreur lors de la récupération des événements', error: e);

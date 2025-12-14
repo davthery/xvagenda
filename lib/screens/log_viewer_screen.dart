@@ -87,7 +87,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Logs de l\'application'),
-        backgroundColor: Colors.green[800],
+        backgroundColor: const Color.fromARGB(255, 24, 24, 24),
         foregroundColor: Colors.white,
         actions: [
           IconButton(

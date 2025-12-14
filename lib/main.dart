@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:calendar_view/calendar_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'dart:io' show Platform;
 import 'screens/home_screen.dart';
 import 'utils/logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialiser sqflite selon la plateforme
+  // Sur macOS, Linux et Windows, utiliser sqflite_common_ffi
+  // Sur Android et iOS, sqflite fonctionne nativement
+  // Sur le web, SQLite n'est pas disponible (localStorage utilisé via SharedPreferences)
+  if (!kIsWeb && (Platform.isMacOS || Platform.isLinux || Platform.isWindows)) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
   
   // Initialiser le logger au démarrage
   final logger = AppLogger();
