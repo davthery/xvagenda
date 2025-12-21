@@ -109,7 +109,7 @@ class RugbyEvent {
           // Si une heure est présente
           if (parts.length > 1 && parts[1].isNotEmpty) {
             final timeParts = parts[1].split(':');
-            if (timeParts.length >= 1) {
+            if (timeParts.isNotEmpty) {
               hour = int.parse(timeParts[0].trim());
             }
             if (timeParts.length >= 2) {
@@ -163,7 +163,7 @@ class RugbyEvent {
           // Si une heure est présente
           if (parts.length > 1 && parts[1].isNotEmpty) {
             final timeParts = parts[1].split(':');
-            if (timeParts.length >= 1) {
+            if (timeParts.isNotEmpty) {
               hour = int.parse(timeParts[0].trim());
             }
             if (timeParts.length >= 2) {
@@ -194,15 +194,33 @@ class RugbyEvent {
         // Gérer les heures décimales pour Excel
         if (excelDate != excelDate.floor()) {
           final fractionalPart = excelDate - excelDate.floor();
-          final microseconds = (fractionalPart * 24 * 60 * 60 * 1000000).toInt();
-          return parsed.add(Duration(microseconds: microseconds));
+          
+          // Convertir la fraction en heures, minutes, secondes
+          final totalSeconds = fractionalPart * 24 * 60 * 60;
+          final hours = (totalSeconds ~/ 3600).toInt();
+          final remainingSeconds = totalSeconds - (hours * 3600);
+          final minutes = (remainingSeconds ~/ 60).toInt();
+          final seconds = (remainingSeconds - (minutes * 60)).toInt();
+          
+          _logger.debug('🔢 Excel: fraction=$fractionalPart -> ${hours}h:${minutes}m:${seconds}s');
+          
+          final result = DateTime(
+            parsed.year,
+            parsed.month,
+            parsed.day,
+            hours,
+            minutes,
+            seconds,
+          );
+          _logger.success('✅ Date Excel parsée: $dateStr -> $result');
+          return result;
         }
         
-        _logger.success('✅ Date Excel parsée: $dateStr -> $parsed');
+        _logger.success('✅ Date Excel parsée (sans heure): $dateStr -> $parsed');
         return parsed;
       }
     } catch (e) {
-      _logger.debug('❌ Échec parsing Excel pour: $dateStr');
+      _logger.debug('❌ Échec parsing Excel pour: $dateStr - Erreur: $e');
     }
 
     _logger.warning('⚠️ Format de date non reconnu: "$dateStr", utilisation de la date actuelle');

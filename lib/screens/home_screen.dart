@@ -6,6 +6,9 @@ import '../services/database_service.dart';
 import '../utils/logger.dart';
 import 'log_viewer_screen.dart';
 
+// Enum pour les différentes vues du calendrier
+enum CalendarViewType { month, week, day }
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -21,8 +24,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   DateTime _currentMonth = DateTime.now();
+  DateTime _currentDate = DateTime.now();
   final GlobalKey<MonthViewState> _monthViewKey = GlobalKey<MonthViewState>();
+  final GlobalKey<WeekViewState> _weekViewKey = GlobalKey<WeekViewState>();
+  final GlobalKey<DayViewState> _dayViewKey = GlobalKey<DayViewState>();
   bool _isOffline = false;
+  CalendarViewType _currentView = CalendarViewType.month;
 
   @override
   void initState() {
@@ -64,10 +71,10 @@ class _HomeScreenState extends State<HomeScreen> {
           throw Exception('Aucun événement disponible et impossible de se connecter à Google Sheets');
         }
       }
-      await _sheetsService.init();
-      events = await _sheetsService.fetchEvents();
+      //await _sheetsService.init();
+      //events = await _sheetsService.fetchEvents();
 
-      _logger.info('📅 Ajout des événements au calendrier:');
+      _logger.info('📅 Ajout des événements au calendrier: ${events.length} événements');
       
       // Ajoute chaque événement au contrôleur du calendrier
       for (var event in events) {
@@ -103,30 +110,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Navigation vers le mois précédent
-  void _goToPreviousMonth() {
-    setState(() {
-      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
-    });
-    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
-  }
-
-  // Navigation vers le mois suivant
-  void _goToNextMonth() {
-    setState(() {
-      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
-    });
-    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
-  }
-
-  // Retour au mois actuel
-  void _goToToday() {
-    setState(() {
-      _currentMonth = DateTime.now();
-    });
-    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
-  }
-
   // Callback appelé quand l'utilisateur change de mois par swipe
   void _onPageChange(DateTime date, int pageIndex) {
     setState(() {
@@ -139,6 +122,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (category == null) return Colors.blue;
     
     switch (category.toLowerCase()) {
+      case 'Séniors':
+        return Colors.black;
+      case 'r5':
+      case 'R5':
+        return Colors.red;
       case 'match':
         return Colors.red;
       case 'entraînement':
@@ -150,6 +138,79 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return Colors.blue;
     }
+  }
+
+  // Méthodes de navigation pour les différentes vues
+  void _goToToday() {
+    setState(() {
+      _currentMonth = DateTime.now();
+      _currentDate = DateTime.now();
+    });
+    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
+    _weekViewKey.currentState?.jumpToWeek(_currentDate);
+    _dayViewKey.currentState?.jumpToDate(_currentDate);
+  }
+
+  void _goToPreviousPeriod() {
+    setState(() {
+      switch (_currentView) {
+        case CalendarViewType.month:
+          _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+          break;
+        case CalendarViewType.week:
+          _currentDate = _currentDate.subtract(const Duration(days: 7));
+          break;
+        case CalendarViewType.day:
+          _currentDate = _currentDate.subtract(const Duration(days: 1));
+          break;
+      }
+    });
+    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
+    _weekViewKey.currentState?.jumpToWeek(_currentDate);
+    _dayViewKey.currentState?.jumpToDate(_currentDate);
+  }
+
+  void _goToNextPeriod() {
+    setState(() {
+      switch (_currentView) {
+        case CalendarViewType.month:
+          _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+          break;
+        case CalendarViewType.week:
+          _currentDate = _currentDate.add(const Duration(days: 7));
+          break;
+        case CalendarViewType.day:
+          _currentDate = _currentDate.add(const Duration(days: 1));
+          break;
+      }
+    });
+    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
+    _weekViewKey.currentState?.jumpToWeek(_currentDate);
+    _dayViewKey.currentState?.jumpToDate(_currentDate);
+  }
+
+  void _changeView(CalendarViewType view) {
+    setState(() {
+      _currentView = view;
+    });
+
+     // Force le rechargement de la vue avec la date actuelle
+/*     Future.delayed(const Duration(milliseconds: 100), () {
+      switch (view) {
+        case CalendarViewType.week:
+          _logger.info('📅 Changement vers la vue semaine');
+          _weekViewKey.currentState?.jumpToWeek(_currentDate);
+          break;
+        case CalendarViewType.day:
+          _logger.info('📅 Changement vers la vue jour');
+          _dayViewKey.currentState?.jumpToDate(_currentDate);
+          break;
+        case CalendarViewType.month:
+          _logger.info('📅 Changement vers la vue mois');
+          _monthViewKey.currentState?.jumpToMonth(_currentMonth);
+          break;
+      }
+    });  */
   }
 
   @override
@@ -250,6 +311,47 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               : Column(
                   children: [
+                    // Barre de sélection des vues
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Colors.blue[200]!,
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SegmentedButton<CalendarViewType>(
+                            segments: const [
+                              ButtonSegment(
+                                value: CalendarViewType.month,
+                                label: Text('Mois'),
+                                icon: Icon(Icons.calendar_month),
+                              ),
+                              ButtonSegment(
+                                value: CalendarViewType.week,
+                                label: Text('Semaine'),
+                                icon: Icon(Icons.calendar_view_week),
+                              ),
+                              ButtonSegment(
+                                value: CalendarViewType.day,
+                                label: Text('Jour'),
+                                icon: Icon(Icons.calendar_view_day),
+                              ),
+                            ],
+                            selected: <CalendarViewType>{_currentView},
+                            onSelectionChanged: (Set<CalendarViewType> newSelection) {
+                              _changeView(newSelection.first);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                     // Barre de navigation du calendrier
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -265,14 +367,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Bouton mois précédent
+                          // Bouton période précédente
                           IconButton(
                             icon: const Icon(Icons.chevron_left),
-                            onPressed: _goToPreviousMonth,
-                            tooltip: 'Mois précédent',
+                            onPressed: _goToPreviousPeriod,
+                            tooltip: 'Période précédente',
                             color: Colors.green[800],
                           ),
-                          // Affichage du mois et année + bouton aujourd'hui
+                          // Affichage du titre et bouton aujourd'hui
                           Expanded(
                             child: InkWell(
                               onTap: _goToToday,
@@ -282,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      _formatMonthYear(_currentMonth),
+                                      _getViewTitle(),
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -303,66 +405,92 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
-                          // Bouton mois suivant
+                          // Bouton période suivante
                           IconButton(
                             icon: const Icon(Icons.chevron_right),
-                            onPressed: _goToNextMonth,
-                            tooltip: 'Mois suivant',
+                            onPressed: _goToNextPeriod,
+                            tooltip: 'Période suivante',
                             color: Colors.green[800],
                           ),
                         ],
                       ),
                     ),
-                    // Calendrier
+                    // Calendrier - Afficher la vue actuelle
                     Expanded(
-                      child: MonthView(
-                        key: _monthViewKey,
-                        controller: _eventController,
-                        minMonth: DateTime(2024),
-                        maxMonth: DateTime(2026),
-                        initialMonth: _currentMonth,
-                        cellAspectRatio: 0.7,
-                        onPageChange: _onPageChange,
-                        onEventTap: (event, date) {
-                          _showEventDetails(context, event);
-                        },
-                        onCellTap: (events, date) {
-                          // Affiche les événements du jour sélectionné
-                          if (events.isNotEmpty) {
-                            _showDayEvents(context, events, date);
-                          }
-                        },
-                        headerBuilder: (date) {
-                          // En-tête des jours de la semaine
-                          return Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.green[100],
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: Colors.green[300]!,
-                                  width: 1,
+                      child: _currentView == CalendarViewType.month
+                          ? MonthView(
+                              key: _monthViewKey,
+                              controller: _eventController,
+                              minMonth: DateTime(2024),
+                              maxMonth: DateTime(2026),
+                              initialMonth: _currentMonth,
+                              cellAspectRatio: 0.7,
+                              onPageChange: _onPageChange,
+                              onEventTap: (event, date) {
+                                _showEventDetails(context, event);
+                              },
+                              onCellTap: (events, date) {
+                                if (events.isNotEmpty) {
+                                  _showDayEvents(context, events, date);
+                                }
+                              },
+                              headerBuilder: (date) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green[100],
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: Colors.green[300]!,
+                                        width: 1,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+                                        .map((day) => Expanded(
+                                              child: Center(
+                                                child: Text(
+                                                  day,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.green[800],
+                                                  ),
+                                                ),
+                                              ),
+                                            ))
+                                        .toList(),
+                                  ),
+                                );
+                              },
+                            )
+                          : _currentView == CalendarViewType.week
+                              ? WeekView(
+                                  key: _weekViewKey,
+                                  controller: _eventController,
+                                  minDay: DateTime(2024),
+                                  maxDay: DateTime(2026),
+                                  initialDay: _currentDate,
+                                  onEventTap: (events, date) {
+                                    if (events.isNotEmpty) {
+                                      _showEventDetails(context, events.first);
+                                    }
+                                  },
+                                  onDateLongPress: (date) {},
+                                )
+                              : DayView(
+                                  key: _dayViewKey,
+                                  controller: _eventController,
+                                  minDay: DateTime(2024),
+                                  maxDay: DateTime(2026),
+                                  initialDay: _currentDate,
+                                  onEventTap: (events, date) {
+                                    if (events.isNotEmpty) {
+                                      _showEventDetails(context, events.first);
+                                    }
+                                  },
+                                  onDateLongPress: (date) {},
                                 ),
-                              ),
-                            ),
-                            child: Row(
-                              children: ['L', 'M', 'M', 'J', 'V', 'S', 'D']
-                                  .map((day) => Expanded(
-                                        child: Center(
-                                          child: Text(
-                                            day,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.green[800],
-                                            ),
-                                          ),
-                                        ),
-                                      ))
-                                  .toList(),
-                            ),
-                          );
-                        },
-                      ),
                     ),
                   ],
                 ),
@@ -377,6 +505,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${months[date.month - 1]} ${date.year}';
   }
 
+  String _getViewTitle() {
+    switch (_currentView) {
+      case CalendarViewType.month:
+        return _formatMonthYear(_currentMonth);
+      case CalendarViewType.week:
+        final weekStart = _currentDate.subtract(Duration(days: _currentDate.weekday - 1));
+        final weekEnd = weekStart.add(const Duration(days: 6));
+        return '${weekStart.day} - ${weekEnd.day} ${_formatMonthYear(weekStart)}';
+      case CalendarViewType.day:
+        return '${_currentDate.day} ${_formatMonthYear(_currentDate)}';
+    }
+  }
+
   bool _isCurrentMonth(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year && date.month == now.month;
@@ -386,10 +527,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final rugbyEvent = event.event as RugbyEvent;
     
     // Extraire le titre original sans les heures
-    final titleWithTime = event.title;
-    final originalTitle = event.title; // TODO titleWithTime.contains(' - ') 
-  //    ? titleWithTime.split(' - ', 1)[1] 
-  //    : titleWithTime;
+    final originalTitle = event.title.contains(' - ') 
+      ? event.title.split(' - ')[1] 
+      : event.title;
     
     showDialog(
       context: context,

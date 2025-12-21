@@ -31,6 +31,9 @@ void main() async {
   if (isFirstRun) {
     await prefs.setBool('has_launched', true);
     logger.info('✨ Première exécution de l\'application');
+  } else 
+  {
+    logger.info('🔄 Application déjà lancée auparavant');
   }
   
   runApp(const XVAgendaApp());
