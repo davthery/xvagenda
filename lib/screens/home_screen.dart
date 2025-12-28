@@ -23,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final _logger = AppLogger();
   bool _isLoading = true;
   String? _errorMessage;
-  DateTime _currentMonth = DateTime.now();
   DateTime _currentDate = DateTime.now();
   final GlobalKey<MonthViewState> _monthViewKey = GlobalKey<MonthViewState>();
   final GlobalKey<WeekViewState> _weekViewKey = GlobalKey<WeekViewState>();
@@ -113,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Callback appelé quand l'utilisateur change de mois par swipe
   void _onPageChange(DateTime date, int pageIndex) {
     setState(() {
-      _currentMonth = date;
+      _currentDate = date;
     });
   }
 
@@ -143,10 +142,10 @@ class _HomeScreenState extends State<HomeScreen> {
   // Méthodes de navigation pour les différentes vues
   void _goToToday() {
     setState(() {
-      _currentMonth = DateTime.now();
+
       _currentDate = DateTime.now();
     });
-    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
+    _monthViewKey.currentState?.jumpToMonth(_currentDate);
     _weekViewKey.currentState?.jumpToWeek(_currentDate);
     _dayViewKey.currentState?.jumpToDate(_currentDate);
   }
@@ -155,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       switch (_currentView) {
         case CalendarViewType.month:
-          _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+          _currentDate = DateTime(_currentDate.year, _currentDate.month - 1);
           break;
         case CalendarViewType.week:
           _currentDate = _currentDate.subtract(const Duration(days: 7));
@@ -165,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
           break;
       }
     });
-    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
+    _monthViewKey.currentState?.jumpToMonth(_currentDate);
     _weekViewKey.currentState?.jumpToWeek(_currentDate);
     _dayViewKey.currentState?.jumpToDate(_currentDate);
   }
@@ -174,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       switch (_currentView) {
         case CalendarViewType.month:
-          _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+          _currentDate = DateTime(_currentDate.year, _currentDate.month + 1);
           break;
         case CalendarViewType.week:
           _currentDate = _currentDate.add(const Duration(days: 7));
@@ -184,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
           break;
       }
     });
-    _monthViewKey.currentState?.jumpToMonth(_currentMonth);
+    _monthViewKey.currentState?.jumpToMonth(_currentDate);
     _weekViewKey.currentState?.jumpToWeek(_currentDate);
     _dayViewKey.currentState?.jumpToDate(_currentDate);
   }
@@ -207,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
           break;
         case CalendarViewType.month:
           _logger.info('📅 Changement vers la vue mois');
-          _monthViewKey.currentState?.jumpToMonth(_currentMonth);
+          _monthViewKey.currentState?.jumpToMonth(_currentDate);
           break;
       }
     });  */
@@ -392,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
-                                    if (!_isCurrentMonth(_currentMonth))
+                                    if (!_isCurrentMonth(_currentDate))
                                       Text(
                                         'Appuyer pour aujourd\'hui',
                                         style: TextStyle(
@@ -421,9 +420,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? MonthView(
                               key: _monthViewKey,
                               controller: _eventController,
-                              minMonth: DateTime(2024),
-                              maxMonth: DateTime(2026),
-                              initialMonth: _currentMonth,
+                              minMonth: DateTime(2025),
+                              maxMonth: DateTime(2027),
+                              initialMonth: _currentDate,
                               cellAspectRatio: 0.7,
                               onPageChange: _onPageChange,
                               onEventTap: (event, date) {
@@ -468,8 +467,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               ? WeekView(
                                   key: _weekViewKey,
                                   controller: _eventController,
-                                  minDay: DateTime(2024),
-                                  maxDay: DateTime(2026),
+                                  minDay: DateTime(2025),
+                                  maxDay: DateTime(2027),
                                   initialDay: _currentDate,
                                   onEventTap: (events, date) {
                                     if (events.isNotEmpty) {
@@ -481,8 +480,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               : DayView(
                                   key: _dayViewKey,
                                   controller: _eventController,
-                                  minDay: DateTime(2024),
-                                  maxDay: DateTime(2026),
+                                  minDay: DateTime(2025),
+                                  maxDay: DateTime(2027),
                                   initialDay: _currentDate,
                                   onEventTap: (events, date) {
                                     if (events.isNotEmpty) {
@@ -508,7 +507,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _getViewTitle() {
     switch (_currentView) {
       case CalendarViewType.month:
-        return _formatMonthYear(_currentMonth);
+        return _formatMonthYear(_currentDate);
       case CalendarViewType.week:
         final weekStart = _currentDate.subtract(Duration(days: _currentDate.weekday - 1));
         final weekEnd = weekStart.add(const Duration(days: 6));
