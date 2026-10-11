@@ -26,6 +26,9 @@ linked_*.ds
 unlinked.ds
 unlinked_spec.ds
 
+# Config et clés sensibles
+lib/config/google_sheets_config.dart
+
 # Android
 **/android/**/gradle-wrapper.jar
 **/android/.gradle
@@ -66,6 +69,13 @@ unlinked_spec.ds
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
 
+# macOS
+**/macos/**/Flutter/ephemeral/
+**/macos/**/Pods/
+**/macos/**/xcuserdata/
+**/macos/**/DerivedData/
+**/macos/Podfile.lock
+
 # Web
 lib/generated_plugin_registrant.dart
 
@@ -77,3 +87,5 @@ coverage/
 !**/ios/**/default.mode2v3
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
+
+**/production
