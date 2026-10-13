@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
 import '../models/rugby_event.dart';
+import '../config/google_sheets_config.dart';
 import '../services/google_sheets_service.dart';
+import '../services/calendar_service.dart';
 import '../services/database_service.dart';
 import '../utils/logger.dart';
 import 'log_viewer_screen.dart';
@@ -18,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GoogleSheetsService _sheetsService = GoogleSheetsService();
+  final CalendarService _calendarService = CalendarService();
   final DatabaseService _dbService = DatabaseService();
   final EventController _eventController = EventController();
   final _logger = AppLogger();
@@ -50,28 +53,35 @@ class _HomeScreenState extends State<HomeScreen> {
       _eventController.removeWhere((event) => true);
       
       List<RugbyEvent> events = [];
-      
-      // Essaie d'abord de charger depuis Google Sheets
+
+      // Source de données active : Sheets (historique) ou Google Calendar.
+      // Les deux chemins partagent le même cache local en secours.
+      final source = GoogleSheetsConfig.useCalendar
+          ? 'Google Calendar'
+          : 'Google Sheets';
       try {
-        _logger.info('🌐 Tentative de chargement depuis Google Sheets...');
-        await _sheetsService.init();
-        events = await _sheetsService.fetchEvents();
-        _logger.success('✅ Événements chargés depuis Google Sheets');
+        _logger.info('🌐 Tentative de chargement depuis $source...');
+        if (GoogleSheetsConfig.useCalendar) {
+          await _calendarService.init();
+          events = await _calendarService.fetchEvents();
+        } else {
+          await _sheetsService.init();
+          events = await _sheetsService.fetchEvents();
+        }
+        _logger.success('✅ Événements chargés depuis $source');
       } catch (e) {
         // En cas d'erreur réseau, charge depuis la base de données locale
-        _logger.warning('⚠️ Impossible de charger depuis Google Sheets: $e');
+        _logger.warning('⚠️ Impossible de charger depuis $source: $e');
         _logger.info('📱 Chargement depuis la base de données locale...');
         events = await _dbService.getAllEvents();
-        
+
         if (events.isNotEmpty) {
           _isOffline = true;
           _logger.success('✅ Événements chargés depuis la base de données locale');
         } else {
-          throw Exception('Aucun événement disponible et impossible de se connecter à Google Sheets');
+          throw Exception('Aucun événement disponible et impossible de se connecter à $source');
         }
       }
-      //await _sheetsService.init();
-      //events = await _sheetsService.fetchEvents();
 
       _logger.info('📅 Ajout des événements au calendrier: ${events.length} événements');
       

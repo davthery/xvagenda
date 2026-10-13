@@ -1,3 +1,6 @@
+import 'package:googleapis/calendar/v3.dart' as gcal;
+
+import '../config/google_calendar_config.dart';
 import '../utils/logger.dart';
 
 class RugbyEvent {
@@ -67,6 +70,33 @@ class RugbyEvent {
     
     _logger.success('✅ Événement créé: ${event.title} - ${event.startTime}');
     return event;
+  }
+
+  // Constructeur depuis un événement Google Calendar (API googleapis).
+  // Les heures sont converties en local (l'app affiche les heures locales).
+  factory RugbyEvent.fromCalendarEvent(gcal.Event event) {
+    final start = event.start;
+    final end = event.end;
+
+    // dateTime (heure locale + fuseau) pour événements ponctuels,
+    // date (YYYY-MM-DD) pour événements journée entière.
+    final String? category =
+        event.extendedProperties?.private?[GoogleCalendarConfig.categoryKey];
+
+    return RugbyEvent(
+      id: event.id ?? '',
+      title: event.summary ?? 'Sans titre',
+      description: event.description ?? '',
+      // Google renvoie dateTime en UTC → conversion en heure locale.
+      // Pour un événement journée entière (date = yyyy-MM-DD déjà parsé en
+      // DateTime par googleapis), on prend 09:00 locale.
+      startTime: start?.dateTime?.toLocal() ??
+          _dayDateTo9h(start?.date) ??
+          DateTime.now(),
+      endTime: end?.dateTime?.toLocal() ?? _dayDateTo9h(end?.date) ?? DateTime.now(),
+      location: event.location,
+      category: (category == null || category.isEmpty) ? null : category,
+    );
   }
 
   // Parse une date au format ISO, Google Sheets ou dd/MM/yyyy HH:mm:ss
@@ -225,6 +255,16 @@ class RugbyEvent {
 
     _logger.warning('⚠️ Format de date non reconnu: "$dateStr", utilisation de la date actuelle');
     return DateTime.now();
+  }
+
+  // Converte une date seule (googleapis renvoie déjà un DateTime parsé depuis
+  // le champ `date` au format yyyy-MM-DD) pour un événement journée entière :
+  // on prend 09:00 heure locale comme approximation.
+  static DateTime? _dayDateTo9h(DateTime? day) {
+    if (day == null) {
+      return null;
+    }
+    return DateTime(day.year, day.month, day.day, 9).toLocal();
   }
 
   @override

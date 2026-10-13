@@ -28,6 +28,7 @@ unlinked_spec.ds
 
 # Config et clés sensibles
 lib/config/google_sheets_config.dart
+lib/config/google_calendar_config.dart
 
 # Android
 **/android/**/gradle-wrapper.jar
