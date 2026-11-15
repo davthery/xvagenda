@@ -40,6 +40,9 @@ class CalendarService {
 
   }
 
+  /// Expose l'API Calendar initialisée (utile pour des outils, ex. migration).
+  gcal.CalendarApi get calendarApi => _calendar;
+
   // Récupère tous les événements depuis Google Agenda
   Future<List<RugbyEvent>> fetchEvents() async {
     try {

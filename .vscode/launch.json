@@ -5,6 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Dart",
+            "type": "dart",
+            "request": "launch",
+            "program": "test/google_calendar_service_test.dart"
+        },
+        {
             "name": "XVagenda (Flutter Chrome)",
             "program": "lib/main.dart",
             "deviceId": "chrome",
