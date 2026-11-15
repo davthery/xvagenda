@@ -32,52 +32,60 @@ class GoogleSheetsService {
     }
   }
 
-  // Récupère tous les événements depuis Google Sheets
+  /// Récupère tous les événements depuis Google Sheets et met à jour le cache.
+  ///
+  /// Lève une exception si la feuille est injoignable : c'est l'appelant qui
+  /// décide du repli sur le cache local (voir `HomeScreen._loadEvents`).
   Future<List<RugbyEvent>> fetchEvents() async {
+    if (_worksheet == null) {
+      await init();
+    }
+
+    _logger.info('🔄 Récupération des événements depuis Google Sheets...');
+
+    // Récupère toutes les lignes (en sautant l'en-tête)
+    final List<List<String>> allRows;
     try {
-      if (_worksheet == null) {
-        await init();
-      }
-
-      _logger.info('🔄 Récupération des événements depuis Google Sheets...');
-
-      // Récupère toutes les lignes (en sautant l'en-tête)
-      final allRows = await _worksheet!.values.allRows(fromRow: 2);
-
-      _logger.info('📊 Nombre de lignes récupérées: ${allRows.length}');
-
-      // Convertit chaque ligne en objet RugbyEvent
-      final events = <RugbyEvent>[];
-      for (int i = 0; i < allRows.length; i++) {
-        final row = allRows[i];
-        if (row.isEmpty ||
-            (row.length > 1 && row[1].toString().trim().isEmpty)) {
-          _logger.debug('⏭️ Ligne ${i + 2} ignorée (vide)');
-          continue;
-        }
-
-        try {
-          final event = RugbyEvent.fromSheetRow(row);
-          events.add(event);
-        } catch (e) {
-          _logger.error('❌ Erreur lors du parsing de la ligne ${i + 2}',
-              error: e);
-        }
-      }
-
-      _logger.success('✅ ${events.length} événements valides récupérés');
-
-      // Sauvegarde les événements en base de données
-      if (events.isNotEmpty) {
-        await _dbService.insertEvents(events);
-      }
-
-      return events;
+      allRows = await _worksheet!.values.allRows(fromRow: 2);
     } catch (e) {
       _logger.error('❌ Erreur lors de la récupération des événements',
           error: e);
-      return [];
+      rethrow;
     }
+    _logger.info('📊 Nombre de lignes récupérées: ${allRows.length}');
+
+    // Convertit chaque ligne en objet RugbyEvent
+    final events = <RugbyEvent>[];
+    for (int i = 0; i < allRows.length; i++) {
+      final row = allRows[i];
+      if (row.isEmpty || (row.length > 1 && row[1].toString().trim().isEmpty)) {
+        _logger.debug('⏭️ Ligne ${i + 2} ignorée (vide)');
+        continue;
+      }
+
+      try {
+        final event = RugbyEvent.fromSheetRow(row);
+        events.add(event);
+      } catch (e) {
+        _logger.error('❌ Erreur lors du parsing de la ligne ${i + 2}',
+            error: e);
+      }
+    }
+
+    _logger.success('✅ ${events.length} événements valides récupérés');
+
+    // Sauvegarde en cache hors ligne. Un échec d'écriture locale ne doit
+    // pas faire échouer un chargement réseau réussi.
+    if (events.isNotEmpty) {
+      try {
+        await _dbService.insertEvents(events);
+      } catch (e) {
+        _logger.error('❌ Erreur lors de la mise en cache des événements',
+            error: e);
+      }
+    }
+
+    return events;
   }
 
   // Récupère les événements dans une plage de dates

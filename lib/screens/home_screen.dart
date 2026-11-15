@@ -19,6 +19,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Au-delà, on considère la source injoignable et on bascule sur le cache.
+  static const _networkTimeout = Duration(seconds: 20);
+
   final GoogleSheetsService _sheetsService = GoogleSheetsService();
   final CalendarService _calendarService = CalendarService();
   final DatabaseService _dbService = DatabaseService();
@@ -61,13 +64,12 @@ class _HomeScreenState extends State<HomeScreen> {
           : 'Google Sheets';
       try {
         _logger.info('🌐 Tentative de chargement depuis $source...');
-        if (GoogleSheetsConfig.useCalendar) {
-          await _calendarService.init();
-          events = await _calendarService.fetchEvents();
-        } else {
-          await _sheetsService.init();
-          events = await _sheetsService.fetchEvents();
-        }
+        // Les services lèvent une exception si la source est injoignable ;
+        // le délai maximal évite de rester bloqué sur un réseau instable.
+        final fetch = GoogleSheetsConfig.useCalendar
+            ? _calendarService.fetchEvents()
+            : _sheetsService.fetchEvents();
+        events = await fetch.timeout(_networkTimeout);
         _logger.success('✅ Événements chargés depuis $source');
       } catch (e) {
         // En cas d'erreur réseau, charge depuis la base de données locale
