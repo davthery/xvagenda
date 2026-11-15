@@ -3,7 +3,6 @@ import 'package:sqflite/sqflite.dart';
 import '../models/rugby_event.dart';
 import '../utils/logger.dart';
 
-
 class DatabaseService {
   static const String _dbName = 'xvagenda.db';
   static const int _dbVersion = 1;
@@ -63,8 +62,10 @@ class DatabaseService {
   }
 
   // Gère les mises à jour de schéma
-  Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
-    _logger.info('🔄 Mise à jour de la base de données v$oldVersion -> v$newVersion');
+  Future<void> _upgradeDatabase(
+      Database db, int oldVersion, int newVersion) async {
+    _logger.info(
+        '🔄 Mise à jour de la base de données v$oldVersion -> v$newVersion');
   }
 
   // Insère ou remplace un événement
@@ -101,6 +102,31 @@ class DatabaseService {
     _logger.success('💾 ${events.length} événements sauvegardés en base');
   }
 
+  /// Remplace tout le cache par [events], dans une transaction.
+  ///
+  /// Le cache reflète ainsi exactement la source : les événements supprimés
+  /// côté source disparaissent, et un changement de source (Sheets → Agenda)
+  /// ne laisse pas d'anciens identifiants en double.
+  Future<void> replaceAllEvents(List<RugbyEvent> events) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+
+    await db.transaction((txn) async {
+      await txn.delete(_eventsTable);
+      final batch = txn.batch();
+      for (final event in events) {
+        batch.insert(
+          _eventsTable,
+          {...event.toMap(), 'createdAt': now},
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+
+    _logger.success('💾 Cache remplacé : ${events.length} événements');
+  }
+
   // Récupère tous les événements
   Future<List<RugbyEvent>> getAllEvents() async {
     final db = await database;
@@ -120,7 +146,8 @@ class DatabaseService {
   }
 
   // Récupère les événements d'une plage de dates
-  Future<List<RugbyEvent>> getEventsByDateRange(DateTime startDate, DateTime endDate) async {
+  Future<List<RugbyEvent>> getEventsByDateRange(
+      DateTime startDate, DateTime endDate) async {
     final db = await database;
     final maps = await db.query(
       _eventsTable,
@@ -154,7 +181,8 @@ class DatabaseService {
   // Compte le nombre d'événements
   Future<int> getEventCount() async {
     final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM $_eventsTable');
+    final result =
+        await db.rawQuery('SELECT COUNT(*) as count FROM $_eventsTable');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 

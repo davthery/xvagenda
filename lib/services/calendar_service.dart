@@ -90,11 +90,12 @@ class CalendarService {
     final events = _mapEvents(page.items);
     _logger.success('✅ ${events.length} événements valides récupérés');
 
-    // Sauvegarde en cache hors ligne. Un échec d'écriture locale ne doit pas
-    // faire échouer un chargement réseau réussi.
+    // Remplace le cache hors ligne (supprime les événements disparus de la
+    // source). Une réponse vide est ignorée pour ne pas effacer le cache.
+    // Un échec d'écriture locale ne fait pas échouer le chargement réseau.
     if (events.isNotEmpty) {
       try {
-        await _dbService.insertEvents(events);
+        await _dbService.replaceAllEvents(events);
       } catch (e) {
         _logger.error('❌ Erreur lors de la mise en cache des événements',
             error: e);
